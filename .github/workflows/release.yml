@@ -1,0 +1,79 @@
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        pg: [14, 15, 16, 17, 18]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build toolchain
+        run: |
+          rustup toolchain install 1.96.0 --profile minimal
+          rustup default 1.96.0
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential clang libclang-dev pkg-config libssl-dev \
+            libreadline-dev zlib1g-dev flex bison libxml2-dev libxslt1-dev \
+            libicu-dev curl
+          cargo install cargo-pgrx --version 0.19.2 --locked
+          cargo pgrx init --pg${{ matrix.pg }}=download --jobs 2
+      - name: Build package
+        run: |
+          set -euo pipefail
+
+          package_name="pg_crypto-0.1.0-pg${{ matrix.pg }}"
+          package_stage="dist/.stage-pg${{ matrix.pg }}"
+          package_root="dist/${package_name}"
+          archive="dist/${package_name}.tar.gz"
+          pg_config_path="$(cargo pgrx info pg-config "${{ matrix.pg }}")"
+
+          ./install.sh \
+            --pg-config "$pg_config_path" \
+            --out-dir "$package_stage"
+
+          # cargo-pgrx mirrors pg_config's absolute installation root under
+          # --out-dir. Archive only that root so runner paths are excluded.
+          pg_root="$(dirname "$("$pg_config_path" --bindir)")"
+          staged_prefix="${package_stage}${pg_root}"
+          test -d "${staged_prefix}/lib"
+          test -d "${staged_prefix}/share"
+          mkdir -p "$package_root"
+          cp -a "${staged_prefix}/." "$package_root/"
+          shared_object="$(find "$package_root/lib" -type f -name pg_crypto.so -print -quit)"
+          test -n "$shared_object"
+          strip --strip-unneeded "$shared_object"
+          file "$shared_object" | grep -q 'stripped'
+          tar -C dist -czf "$archive" "$package_name"
+
+          while IFS= read -r entry; do
+            case "$entry" in
+              "${package_name}/"|"${package_name}/lib/"*|"${package_name}/share/"*) ;;
+              *) echo "unexpected archive path: $entry" >&2; exit 1 ;;
+            esac
+          done < <(tar -tzf "$archive")
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pg_crypto-0.1.0-pg${{ matrix.pg }}
+          path: dist/pg_crypto-0.1.0-pg${{ matrix.pg }}.tar.gz
+
+  publish:
+    needs: package
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.tar.gz
+          generate_release_notes: true

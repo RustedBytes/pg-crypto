@@ -1,0 +1,5 @@
+comment = 'Pure-Rust pgcrypto compatibility and modern cryptography'
+default_version = '0.1.0'
+module_pathname = '$libdir/pg_crypto'
+relocatable = true
+superuser = false

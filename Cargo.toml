@@ -1,0 +1,53 @@
+[package]
+name = "pg_crypto"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.96"
+license = "MIT"
+description = "Pure-Rust pgcrypto compatibility and modern cryptography for PostgreSQL"
+autobins = false
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[features]
+default = ["pg18"]
+pg14 = ["pgrx/pg14"]
+pg15 = ["pgrx/pg15"]
+pg16 = ["pgrx/pg16"]
+pg17 = ["pgrx/pg17"]
+pg18 = ["pgrx/pg18"]
+
+[dependencies]
+pgrx = "=0.19.2"
+aes = "0.9.1"
+base64 = "0.22.1"
+blake2 = "0.11.0"
+blowfish = "0.10.0"
+cbc = { version = "0.2.1", features = ["alloc"] }
+cfb-mode = { version = "0.9.1", features = ["alloc"] }
+cipher = { version = "0.5.2", features = ["alloc", "block-padding"] }
+dryoc = { version = "1.0.0", default-features = false, features = ["base64", "u64_backend"] }
+ecb = { version = "0.2.1", features = ["alloc"] }
+hkdf = "0.13.0"
+hmac = "0.13.0"
+md-5 = "0.11.0"
+pwhash = "1.0.0"
+sequoia-openpgp = { version = "2.4.1", default-features = false, features = ["compression-deflate", "crypto-rust", "allow-experimental-crypto", "allow-variable-time-crypto"] }
+sha1 = "0.11.0"
+sha2 = "0.11.0"
+sha3 = "0.11.0"
+uuid = { version = "1.24.1", features = ["v4"] }
+
+[profile.release]
+panic = "unwind"
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+
+[profile.dev]
+panic = "unwind"
+strip = "symbols"
+
+[package.metadata.pgrx]
+extension_name = "pg_crypto"
